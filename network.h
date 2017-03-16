@@ -1,15 +1,27 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <math.h>
+#pragma once
+#include <signal.h>
 
+#define BREAKPOINT (raise(SIGINT))
+#define NULL 0
 
-#ifndef NETWORK
-#define NETWORK
+typedef void (*kernel)(int size, double* data);
 
-#define true 1
-#define false 0
+struct ActivationFunction {
+    enum Enum {
+        RELU,
+        LINEAR,
+        SIGMOID,
+        TANH
+    };
+    bool max_bounded;
+    double max_val;
+    bool min_bounded;
+    double min_val;
+    kernel activation;
+    kernel activation_prime;
+};
 
-
+ActivationFunction getActivationFunction(ActivationFunction::Enum func);
 
 ///Data structure for a neural layer
 typedef struct Layer {
@@ -18,9 +30,7 @@ typedef struct Layer {
   int nN;
   /// Number of inputs connected to the layer
   int nInputs;
-
-  /// Pointer to the input values
-  double *inputs;
+  int nOutputs;
   
   /// Neuron outputs
   double *outputs;
@@ -28,100 +38,68 @@ typedef struct Layer {
   double *weights;
   double *biases;
   
-  /// Scale for parameters
-  double pscale;
-  
-  
+  ActivationFunction::Enum activation_enum;
+  kernel activation;
+  kernel activation_prime;
 } Layer;
+
+void layer_compute_weights(Layer* layer);
+void layer_compute(Layer* layer);
+
+/*
+Networks contains nLayers = 1 + nHiddenLayers.
+Parameters layout is [layer 0 weights|layer 0 bias| layer 1 weights...].
+*/
 
 typedef struct Network {
 
-	///number of inputs, outputs and hidden layers
-	int nInputs;
-	int nOutputs;
-	int nHiddenLayers;
+    ///number of inputs, outputs and hidden layers
+    int nInputs;
+    int nOutputs;
+    int nHiddenLayers;
+    
+    /// Pointer to the inputs array
+    const double *inputs;
+    double *outputs;
 
-	int *layersize;
-	
-	/// Pointer to the inputs array
-	double *inputs;
-	double *outputs;
-
-	/// Network weights, biases
-	double *data;
-	int datasize;
-	int alloc_data;
-
-	double *service;
-	int nActivs;
-	
-	/// Number of layers
-	int nLayers;
-	/// List of layers
-	Layer *layers;
-  
+    /// Network weights, biases
+    double* parameters;
+    int parameter_size;
+    
+    /// Number of layers
+    int nLayers;
+    /// List of layers
+    Layer *layers;
 } Network;
 
-typedef struct RecurrentNetwork {
-	
-	int nInputs;
-	int nOutputs;
-	int nHidden;
-	int nNeurons; //including in, out and hidden
-	
-	double *inputs, *outputs, *states, *buffer;
-	
-	double *data;
-	double *weights, *biases;
-	
-	double tolerance, delta;
-	
-	int alloc_data;
-	
-} RecurrentNetwork;
-
-RecurrentNetwork* rnn_create(int nin, int nout, int nhid);
-void rnn_randomise(RecurrentNetwork *rnn);
-void rnn_load(RecurrentNetwork *rnn, double *data);
-void rnn_clean(RecurrentNetwork *rnn);
-void rnn_reset(RecurrentNetwork *rnn);
-
-void rnn_update_tanh_tanh(RecurrentNetwork *rnn);
-
-void rnn_scf(RecurrentNetwork *rnn, int maxIter);
 
 
+/*Creates a network. Should be released with network_free. 
+Network must contain atleast one layer (output). Other layers are hidden.*/
+Network* network_create(int input_size, 
+    int num_layers, const int* layer_sizes, 
+    int num_activations, const ActivationFunction::Enum* func);
 
-Layer* layer_add(Network*, int, int, double pscale);
-void layer_randomise(Layer* layer);
-void layer_compute(Layer*);
+void network_load_parameters(Network* n, 
+    int parameter_size, 
+    const double* parameters);
 
-double network_relu(double arg);
-double network_tanh(double arg);
+/*Feedforward through all layers. After this network_output gives the result*/
+void network_compute(Network* network, int size, const double* input);
+void network_destroy(Network* network);
 
-
-Network* network_create(int inputs);
-void network_compute(Network *);
-void network_mlp_compute_gaus_lin(Network* net);
-void network_mlp_compute_relu_lin(Network* net);
-void network_mlp_compute_relu_tanh(Network* net);
-void network_mlp_compute_tanh_tanh(Network* net);
-void network_mlp_compute_tanh_lin(Network* net);
-
-
-extern Network* network_mlp_create(int *layersize, int nlayers);
-extern void network_mlp_randomise(Network *net, double pscale);
-extern void network_mlp_loaddata(Network *net, double *data);
-extern void network_mlp_compute(Network *net);
-extern void network_mlp_clean(Network *net);
+/*If output size is defined it has the output size*/
+const double* network_output(Network* n, int* output_size = NULL);
 
 
+/*Armadillo interface for convinience*/
+#include <armadillo>
+void network_load_parameters(Network* n, const arma::vec& parameters);
+void network_compute(Network* n, const arma::vec& input);
+void network_output(Network* n, arma::vec& output);
 
 
-//MLPflex
-
-
-
-
-#endif
-
+/*Simple backpropagation for testing purposes*/
+void network_backpropagate(Network* n, const double* input, const double* result, double rate);
+/*Simple GA*/
+void network_simple_ga();

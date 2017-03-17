@@ -51,6 +51,8 @@ int main(int argc, char* argv[]) {
         epoch_errors[i] = sum(result);
     }
     
+    //Evaluate NN on the range x and gather the result to result
+    //NN(x) = result
     vec result(num);
     gather_result(n, x, result);
     mat out(x.n_rows, 3);

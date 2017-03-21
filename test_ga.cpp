@@ -91,6 +91,9 @@ int main() {
     Network* n = network_create(1, 
         SIZEOF(layer_sizes), layer_sizes, 
         SIZEOF(activators), activators);
+    /*Only one-to-one mapping*/
+    assert(n->nInputs == 1 && n->Outputs == 1);
+
     mat population = randu<mat>(n->parameter_size, population_size);
 
     vec fitness(population.n_cols);

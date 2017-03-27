@@ -53,7 +53,7 @@ int num = 100;///
 
   int  netDataSize = net -> parameter_size;
 
- if(rerun==0){DNAS = randu<mat>(200,netDataSize);} else{DNAS.load(loadBi);}
+ if(rerun==0){DNAS = randu<mat>(100,netDataSize);} else{DNAS.load(loadBi);}
 
     network_load_parameters(net, parameters);///
 

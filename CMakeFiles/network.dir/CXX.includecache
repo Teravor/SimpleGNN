@@ -1,0 +1,30 @@
+#IncludeRegexLine: ^[ 	]*#[ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/pi/SimpleGNN/network.cpp
+network.h
+/home/pi/SimpleGNN/network.h
+stdlib.h
+-
+math.h
+-
+algorithm
+-
+assert.h
+-
+armadillo
+-
+iostream
+-
+
+/home/pi/SimpleGNN/network.h
+signal.h
+-
+armadillo
+-
+

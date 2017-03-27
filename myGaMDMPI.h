@@ -227,61 +227,72 @@ if(world_rank == 0){
 //----------------------------------------------------------------------
 //----------------------------------------------------------------------
 
-//mat hw(Network* net, mat ln, cube lnu, mat xu, mat lu,int uSize,int nSize){
-//  mat x = zeros<mat>(xu.n_rows,xu.n_cols);
-//  vec buffxn1 = zeros<vec>(xu.n_cols);
-//  vec buffxn2 = zeros<vec>(xu.n_cols);
-//  vec justZeros = zeros<vec>(xu.n_cols);
-//
+mat hw(Network* net, mat ln, cube lnu, mat xu, mat lu,int uSize,int nSize){
+  mat x = zeros<mat>(xu.n_rows,xu.n_cols);
+  vec buffxn1 = zeros<vec>(xu.n_cols);
+  vec buffxn2 = zeros<vec>(xu.n_cols);
+  vec justZeros = zeros<vec>(xu.n_cols);
+
 //  double lnn  = ln.n_cols;
 //  double lnun = lnu.slice(0).n_cols;
 //  double xun  = xu.n_cols;
 //  double lun  =lu.n_cols;
-//
-//  double lnnx = lnn + lnun;
-//  double lnnxx = lnnx + xun;
-//  double lnnxxx = lnnxx + lun;
-////  cout << lnnxx << endl;
-// 
-//  for(int n=0;n<nSize;n++){
-//    buffxn2 = justZeros;
-//
-//    for(int u=0;u<uSize;u++){
-//        buffxn1 = justZeros;
-//        if(n==u) continue;
-//
-//        for(int i=0;i<lnn;i++){ //??? FIX or maybe not
-//           net -> inputs[i] = ln(n,i);
-//        }
-//
-//        for(int i=lnn;i<lnnx;i++){
-//         net -> inputs[i] = lnu(n,i-lnn,u);
-//        }
-//
-//        for(int i=lnnx;i<lnnxx;i++){
-//         net -> inputs[i] = xu(u,i-lnnx);
-//        }
-//
+  double lnn  = ln.n_cols;
+  double lnun = lnu.slice(0).n_cols;
+  double xun  = xu.n_cols;
+  double lun  =lu.n_cols;
+
+
+  double lnnx = lnn + lnun;
+  double lnnxx = lnnx + xun;
+  double lnnxxx = lnnxx + lun;
+//  vec inputs;
+    vec inputs(lnnxxx);
+  cout << inputs.n_elem << endl;
+//  cout << lnnxx << endl;
+ 
+  for(int n=0;n<nSize;n++){
+    buffxn2 = justZeros;
+
+    for(int u=0;u<uSize;u++){
+        buffxn1 = justZeros;
+        if(n==u) continue;
+
+        for(int i=0;i<lnn;i++){ //??? FIX or maybe not
+            inputs(i) = ln(n,i);
+        }
+        
+
+        for(int i=lnn;i<lnnx;i++){
+          inputs(i) = lnu(n,i-lnn,u);
+        }
+
+
+        for(int i=lnnx;i<lnnxx;i++){
+          inputs(i) = xu(u,i-lnnx);
+        }
+
 //        for(int i=lnnxx;i<lnnxxx;i++){
 //         net -> inputs[i] = lu(u,i - lnnxx);
 //        }
 //           network_mlp_compute_relu_lin(net);
-//
-//        for(int i=0; i < xu.n_cols; i++){
-//
-//          buffxn1(i) = net -> outputs[i]; 
-//
-//          }
-//        buffxn2 = buffxn2 + buffxn1;
-//
-//    }
-//      x.row(n) = buffxn2.t();
-//
-//  }
-//
-//  return x;
-//
-//  }
+       network_compute(net, inputs);
+
+        for(int i=0; i < xu.n_cols; i++){
+
+          buffxn1(i) = net -> outputs[i]; 
+
+          }
+        buffxn2 = buffxn2 + buffxn1;
+
+    }
+      x.row(n) = buffxn2.t();
+
+  }
+
+  return x;
+
+  }
 
 
 #endif

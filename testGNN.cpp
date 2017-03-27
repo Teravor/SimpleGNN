@@ -2,10 +2,10 @@
 #include <string>
 #include <armadillo>
 #include <time.h>
-extern "C" {
 #include "network.h"
-}
-#include "myGa6.h"
+#include "myGaMDMPI.h"
+
+#define SIZEOF(_arr) (sizeof(_arr)/sizeof(_arr[0]))
 
 
 using namespace std;
@@ -14,24 +14,31 @@ using namespace arma;
 
 int main(int argc, char* argv[]){
 
-  int sizeofsystem = 100;
   int sizeofstate = 10;
 
      srand(time(NULL));
-     int sizes[3] = {sizeofstate*4,5,sizeofstate};
 
-     Network *net = network_mlp_create(sizes,3);
- for(int i=0; i < net -> datasize; i++){
-     net -> data[i] =0.01*(double)(rand() + 1)/(RAND_MAX);
+
+
+   ActivationFunction::Enum activators[] = {ActivationFunction::SIGMOID,ActivationFunction::SIGMOID, ActivationFunction::SIGMOID};///
+   int layer_sizes[] =  {3,3,sizeofstate};///
+
+   Network* net = network_create(1, SIZEOF(layer_sizes), layer_sizes, SIZEOF(activators), activators);///
+   vec parameters(net->parameter_size, fill::randn);///
+
+  int  netDataSize = net -> parameter_size;
+
+ for(int i=0; i <netDataSize ; i++){
+     net -> parameters[i] =0.01*(double)(rand() + 1)/(RAND_MAX);
  }
 
-    mat ln = randu<mat>(100,sizeofstate);
-    cube lnu = randu<cube>(100,sizeofstate,100);
-    mat xu = randu<mat>(100,sizeofstate);
-    mat Xold = randu<mat>(100,sizeofstate) ; 
-    mat Xdiff = ones<mat>(100,sizeofstate) ; 
-    mat X = randu<mat>(100,sizeofstate);
-    mat lu = randu<mat>(100,sizeofstate);
+    mat ln = randu<mat>(88,sizeofstate);
+    cube lnu = randu<cube>(88,sizeofstate,88);
+    mat xu = randu<mat>(88,sizeofstate);
+    mat Xold = randu<mat>(88,sizeofstate) ; 
+    mat Xdiff = ones<mat>(88,sizeofstate) ; 
+    mat X = randu<mat>(88,sizeofstate);
+    mat lu = randu<mat>(88,sizeofstate);
 
 for(int i=0; i < 100; i++){
 //     X.print("X");

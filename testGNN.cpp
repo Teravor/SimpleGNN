@@ -20,10 +20,10 @@ int main(int argc, char* argv[]){
 
 
 
-   ActivationFunction::Enum activators[] = {ActivationFunction::SIGMOID,ActivationFunction::SIGMOID, ActivationFunction::SIGMOID};///
-   int layer_sizes[] =  {3,3,sizeofstate};///
+   ActivationFunction::Enum activators[] = {ActivationFunction::RELU, ActivationFunction::LINEAR};///
+   int layer_sizes[] =  {3,sizeofstate};///
 
-   Network* net = network_create(1, SIZEOF(layer_sizes), layer_sizes, SIZEOF(activators), activators);///
+   Network* net = network_create(40, SIZEOF(layer_sizes), layer_sizes, SIZEOF(activators), activators);///
    vec parameters(net->parameter_size, fill::randn);///
 
   int  netDataSize = net -> parameter_size;
@@ -32,22 +32,28 @@ int main(int argc, char* argv[]){
      net -> parameters[i] =0.01*(double)(rand() + 1)/(RAND_MAX);
  }
 
-    mat ln = randu<mat>(88,sizeofstate);
-    cube lnu = randu<cube>(88,sizeofstate,88);
-    mat xu = randu<mat>(88,sizeofstate);
-    mat Xold = randu<mat>(88,sizeofstate) ; 
-    mat Xdiff = ones<mat>(88,sizeofstate) ; 
-    mat X = randu<mat>(88,sizeofstate);
-    mat lu = randu<mat>(88,sizeofstate);
+    mat ln = randu<mat>(40,sizeofstate);
+    cube lnu = randu<cube>(40,sizeofstate,40);
+    mat xu = randu<mat>(40,sizeofstate);
+    mat Xold = randu<mat>(40,sizeofstate) ; 
+    mat Xdiff = ones<mat>(40,sizeofstate) ; 
+    mat X = randu<mat>(40,sizeofstate);
+    mat lu = randu<mat>(40,sizeofstate);
+     X.print("X");
+     Xold.print("Xold");
+     Xdiff.print("Xdiff");
 
 for(int i=0; i < 100; i++){
 //     X.print("X");
      cout << i << endl;
      Xold = X;
-     X = hw(net, ln,lnu,X, lu,100,100);
+     X = hw(net, ln,lnu,X, lu,40,40);
      Xdiff = Xold - X;
      X.save("GNNX.dat");
      X.save("GNNXraw.dat",raw_ascii);
+     X.print("X cured");
+     Xold.print("Xold cured");
+     Xdiff.print("Xdiff cured");
 }
 
      
@@ -58,6 +64,7 @@ for(int i=0; i < 100; i++){
 return 0;
 
 }
+
 
 
 

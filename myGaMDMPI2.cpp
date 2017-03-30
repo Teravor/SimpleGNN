@@ -3,45 +3,40 @@
 #include <armadillo>
 #include <time.h>
 #include "network.h"
-#include "myGa7.h"
+#include "myGaMDMPI.h"
 
 #define SIZEOF(_arr) (sizeof(_arr)/sizeof(_arr[0]))
 
 using namespace std;
 using namespace arma;
 
-
 int main(int argc, char* argv[]){
-     int rerun = strtol(argv[1],NULL,10);
-     int decisionVal;
-     if (rerun == 0)
-      {
-       cout << "You are abount to start a new NN, are you sure?(1/0): " ;
-       cin >> decisionVal;
-       if(decisionVal == 1) {} else{exit(1);};
-         }
 
+  string* myTypes = getType("au40cu40.xyz");
+
+  mat A = getPos("au40cu40.xyz");
+  
+     int rerun = strtol(argv[1],NULL,10);
 
      int finalizeit = strtol(argv[2],NULL,10);
      int generations = strtol(argv[3],NULL,10);
 
      double temperature = (double) strtol(argv[4],NULL,10);
-     if (temperature > 50 && rerun > 0)
-      {
-       cout << "Temperature is quite high, This could blow up the previous NN. Sure you wanna continue?(1/0)" ;
-       cin >> decisionVal;
-       if(decisionVal == 1) {} else{exit(1);};
-         }
 
-     double regu = (double) strtol(argv[5],NULL,10);
+     double regu =  atof(argv[5]);
      double decendingTemp =  atof(argv[6]);
      string saveBi = argv[7];
      string loadBi = argv[8];
-cout << 100.0 * decendingTemp << endl;
-//  int finalizeit = 0;
+
+     int world_size;
+     int world_rank;
+
+MPI_Init(&argc,&argv);
+MPI_Comm_size(MPI_COMM_WORLD, &world_size);
+MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
   vec winning;
 	mat X;
-//  int generations = 200;
+
 //	X.load("sinx.dat");
 
 int num = 100;///
@@ -54,8 +49,8 @@ int num = 100;///
 //   X.print("a");
    
   
-   ActivationFunction::Enum activators[] = {ActivationFunction::SIGMOID, ActivationFunction::SIGMOID};///
-   int layer_sizes[] =  {100,1};///
+   ActivationFunction::Enum activators[] = {ActivationFunction::SIGMOID,ActivationFunction::SIGMOID, ActivationFunction::SIGMOID};///
+   int layer_sizes[] =  {50,50,1};///
 
    Network* net = network_create(1, SIZEOF(layer_sizes), layer_sizes, SIZEOF(activators), activators);///
    vec parameters(net->parameter_size, fill::randn);///
@@ -68,19 +63,19 @@ int num = 100;///
 
      
 												      
-     cout << net -> outputs[0] << endl; 
+  if(world_rank==0)   cout << net -> outputs[0] << endl; 
 
 
      for(int gen = 0; gen < generations; gen++){
-      winning=  getBest(DNAS, net, X);
+      winning=  getBest(DNAS, net, X,world_rank, world_size);
 //     timer.tic();
-	      DNAS = ga_eval(DNAS, net, X ,0.001*temperature, 0.001*temperature, 0.0001*temperature,0.1*temperature,0.00001*temperature,1.0*temperature,finalizeit, regu);
+	      DNAS = ga_eval(DNAS, net, X ,0.001*temperature, 0.001*temperature, 0.0001*temperature,0.1*temperature,0.00001*temperature,1.0*temperature,finalizeit, regu, world_rank, world_size);
 
-      DNAS.save(saveBi,raw_ascii);
+     if(world_rank == 0) DNAS.save(saveBi,raw_ascii);
 
-      cout << gen << " winning value is: " <<  getVal(winning, net, X.row(1)) <<endl;
+    if(world_rank == 0){  cout << gen << " winning value is: " <<  getVal(winning, net, X.row(1)) <<endl;
       cout << gen << " Real    value is: " <<  X(1,X.n_cols - 1) <<endl;
-      cout << gen << " Diff    value is: " <<  getValDiff(winning, net, X.row(1)) <<endl;
+      cout << gen << " Diff    value is: " <<  getValDiff(winning, net, X.row(1)) <<endl;}
 
 //     myTime = timer.toc();
 
@@ -88,12 +83,11 @@ int num = 100;///
 
      }
 
-     vec winner =  getBest(DNAS, net, X);
+     vec winner =  getBest(DNAS, net, X, world_rank, world_size);
 
-     vec Vals = getResults(DNAS, net, X);
-     cout << size(Vals) << endl;
+     vec Vals = getResults(DNAS, net, X, world_rank, world_size);
      mat Y = join_rows(x,Vals);
-     Y.save("sinTest.dat",raw_ascii);
+    if(world_rank == 0) Y.save("sinTest.dat",raw_ascii);
 
      winner.print("Final Winner!");
      double winVal = getVal(winner, net, X.row(10));
@@ -101,7 +95,8 @@ int num = 100;///
 //     cout << "winval: " << winVal << endl;
 //      winner.save("bestDNAS.dat",raw_ascii);
 														      
+ MPI_Finalize();
 															      
 return 0;
-
 }
+

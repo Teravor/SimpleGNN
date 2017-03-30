@@ -121,6 +121,7 @@ void network_load_parameters(Network* n, const arma::vec& parameters) {
     network_load_parameters(n, parameters.n_rows, parameters.memptr());
 }
 void network_compute(Network* n, const arma::vec& input) {
+  
     network_compute(n, input.n_rows, input.memptr());
 }
 void network_output(Network* n, arma::vec& output) {

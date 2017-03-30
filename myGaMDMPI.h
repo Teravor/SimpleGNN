@@ -245,19 +245,23 @@ mat hw(Network* net, mat ln, cube lnu, mat xu, mat lu,int uSize,int nSize){
   double lnnxx = lnnx + xun;
   double lnnxxx = lnnxx + lun;
 
-    vec inputs = zeros<vec>(lnnxxx);
+  cout << lnnxxx << endl;
+
+  vec inputs = zeros<vec>(lnnxxx);
 
  
   for(int n=0;n<nSize;n++){
     buffxn2 = justZeros;
 
-    for(int u=0;u<uSize;u++){
-        buffxn1 = justZeros;
-        if(n==u) continue;
-
         for(int i=0;i<lnn;i++){ 
             inputs(i) = ln(n,i);
         }
+
+    for(int u=0;u<uSize;u++){
+        buffxn1 = justZeros;
+
+
+        if(n==u) continue;
         
         for(int i=lnn;i<lnnx;i++){
           inputs(i) = lnu(n,i-lnn,u);

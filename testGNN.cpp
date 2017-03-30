@@ -20,7 +20,7 @@ int main(int argc, char* argv[]){
 
 
 
-   ActivationFunction::Enum activators[] = {ActivationFunction::RELU, ActivationFunction::LINEAR};///
+   ActivationFunction::Enum activators[] = {ActivationFunction::TANH, ActivationFunction::LINEAR};///
    int layer_sizes[] =  {3,sizeofstate};///
 
    Network* net = network_create(40, SIZEOF(layer_sizes), layer_sizes, SIZEOF(activators), activators);///

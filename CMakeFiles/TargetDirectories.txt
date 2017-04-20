@@ -1,4 +1,0 @@
-/home/pi/SimpleGNN/CMakeFiles/rebuild_cache.dir
-/home/pi/SimpleGNN/CMakeFiles/edit_cache.dir
-/home/pi/SimpleGNN/CMakeFiles/test_ga.dir
-/home/pi/SimpleGNN/CMakeFiles/network.dir

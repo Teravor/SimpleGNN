@@ -17,7 +17,7 @@ add_library(network network.cpp)
 target_link_libraries(network ${ARMADILLO_LIBRARIES})
 
 #GNN library
-add_library(GNN GNN.cpp)
+add_library(GNN GNN.cpp GNN_interface.cpp)
 target_link_libraries(GNN network ${ARMADILLO_LIBRARIES})
 
 #Test cases
@@ -33,3 +33,6 @@ target_link_libraries(testGNN network)
 #GNN test case
 add_executable(test_GNN GNN_test.cpp)
 target_link_libraries(test_GNN GNN network ${ARMADILLO_LIBRARIES})
+add_executable(test_interface GNN_interface_test.cpp)
+target_link_libraries(test_interface GNN network ${ARMADILLO_LIBRARIES})
+

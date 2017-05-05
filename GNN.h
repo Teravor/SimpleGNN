@@ -92,7 +92,7 @@ struct GNNGraph {
     int n_nodes;
     int n_edges;
 
-    int neighbour_size;
+    int neighbor_size;
 
     //n_neighbors stores index to neighbors and size as a difference of consecutive elements
     int* n_neighbors;
@@ -115,6 +115,7 @@ struct GNNGraph {
     void sortPositions();
 
     void debug(std::ostream& stream);
+    void debug(std::ostream& stream, int node_index);
 private:
     void create(GraphHelper& _helper);
     void destroy();
@@ -146,11 +147,22 @@ struct GNN {
     void setState(int _size, const double* _state);
     //Do one iteration
     double step();
+    //Converge to given accuracy and output
+    int output_size();
+    void compute(double _tol, int size, double* output);
+
     //Mostly for internal use, use if you know what you are doing
     void stepPositional();
     void stepNonPositional();
     //For debug
     void printState(std::ostream& stream);
+
+    void get_parameters(int size, double* _parameters);
+    void set_parameters(int size, const double* _parameters);
+    int parameter_size();
+    /*Armadillo interface*/
+    void load_parameters(const arma::vec& parameters);
+    void compute(double _tol, arma::vec& output);
 
 private:
     GNN(const GNN&); // no implementation

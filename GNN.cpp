@@ -231,12 +231,32 @@ void GNNGraph::debug(std::ostream& stream) {
     
 }
 
+void GNNGraph::debug(std::ostream& _stream, int _index) {
+    assert(_index < n_nodes);
+    _stream << "Debug for node: " << _index << std::endl;
+    Node node(maxNeighbors());
+    getNode(_index, node);
+    _stream << "Node num neighbors: " << node.num_neighbors << std::endl;
+    _stream << "Node neighbors:" << std::endl;
+    for(int i = 0; i < node.num_neighbors; ++i) {
+        _stream << node.neighbors[i] << " ";
+    }
+    _stream << std::endl;
+    _stream << "Node edges:" << std::endl;
+    for(int i = 0; i < node.num_neighbors; ++i) {
+        _stream << i << ' ' << edges[edges[i]] << ' ';
+        _stream << '(' << i << ',' << neighbors[node.neighbors[i]] << ") ";
+        _stream << std::endl;
+    }
+}
+
 GNNGraph::Node::Node(int _max_neighbors) {
     neighbors = new int[_max_neighbors];
     edges = new int[_max_neighbors];
 }
 
 GNNGraph::Node::~Node() {
+    //These segfault, why?
     //delete[] neighbors;
     //delete[] edges;
 }
@@ -259,7 +279,7 @@ GNN::GNN(GraphHelper& _helper, int _node_state_size, Network* _fw, Network* _gw)
         nn_input_size = graph.node_label_size + node_state_size + graph.edge_label_size + graph.node_label_size;
     }
     nn_input = new double[nn_input_size];
-    printf("%d, %d\n", fw->nInputs, nn_input_size);
+    //printf("%d, %d\n", fw->nInputs, nn_input_size);
     assert(fw->nInputs == nn_input_size);
     assert(fw->nOutputs == node_state_size);
     assert(gw->nInputs == node_state_size);
@@ -376,4 +396,52 @@ void GNN::printState(std::ostream& stream) {
         std::cout << state[i] << ' ';
     }
     std::cout << std::endl;
+}
+
+void GNN::get_parameters(int size, double* _parameters) {
+    assert(size == fw->parameter_size + gw->parameter_size);
+    memcpy(_parameters, fw->parameters, fw->parameter_size*sizeof(double));
+    _parameters += fw->parameter_size;
+    memcpy( _parameters, gw->parameters, gw->parameter_size*sizeof(double));
+}
+
+void GNN::set_parameters(int size, const double* _parameters) {
+    assert(size == fw->parameter_size + gw->parameter_size);
+    memcpy(fw->parameters, _parameters, fw->parameter_size*sizeof(double));
+    _parameters += fw->parameter_size;
+    memcpy(gw->parameters, _parameters, gw->parameter_size*sizeof(double));
+}
+
+int GNN::parameter_size() {
+    return fw->parameter_size + gw->parameter_size;
+}
+
+int GNN::output_size() {
+    return graph.n_nodes*gw->nOutputs;
+}
+
+void GNN::compute(double _tol, int size, double* _output) {
+    assert(size == output_size());
+    //Iterate to self consistency
+    static const int MAX_ITERATIONS = 100;
+    for(int i = 0; i < MAX_ITERATIONS; ++i) {
+        double err = step();
+        if(err < _tol)
+            break;
+    }
+    //Get the output from gw network to _output
+    for(int i = 0; i < graph.n_nodes; ++i) {
+        network_compute(gw, node_state_size, &state[i*node_state_size]);
+        const double* out = network_output(gw);
+        memcpy(_output, out, node_state_size*sizeof(double));
+        _output += node_state_size*sizeof(double);
+    }
+}
+
+void GNN::load_parameters(const arma::vec& _parameters) {
+    set_parameters(_parameters.n_rows, _parameters.memptr());
+}
+
+void GNN::compute(double _tol, arma::vec& output) {
+    compute(_tol, output.n_rows, output.memptr());
 }

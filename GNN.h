@@ -40,6 +40,16 @@ neighbor vector values are padded with special null value which depends on the a
 function of the network fw (null value is such that it does not trigger activation).
 
 */
+
+struct Box {
+    void init(double x, double y, double z);
+    double box_size[3];
+    double r_box_size[3];
+    /*Calculate distance with minimum image convention*/
+    double distance(const double* v1, const double* v2) const;
+    double relative_pos(double* relative, const double* origo, double* neighbor);
+};
+
 struct GraphHelper {
     int nodeLabelSize;
     int edgeLabelSize;
@@ -49,9 +59,10 @@ struct GraphHelper {
     std::vector<double> node_labels;
     std::vector<double> edge_labels;
     bool has_position;
+    Box box;
 
 
-    GraphHelper(int nodeLabelSize, int _edgeLabelSize, bool _has_position = false);
+    GraphHelper(int nodeLabelSize, int _edgeLabelSize, bool _has_position = false, double* box_size = nullptr);
     //Input functions
     int addNode(int _size, const double* _nodeLabel);
     void addEdge(int node1, int node2, int _size, const double* _edgeLabel);
@@ -86,8 +97,6 @@ struct GNNGraph {
         int num_neighbors;
         int* neighbors;
         int* edges;
-        Node(int _max_neighbors);
-        ~Node();
     };
     int n_nodes;
     int n_edges;
@@ -112,7 +121,7 @@ struct GNNGraph {
     void getNode(int _node_index, Node& _node);
 
     //Sort neighbors according to their position, for internal use
-    void sortPositions();
+    void sortPositions(const Box& box);
 
     void debug(std::ostream& stream);
     void debug(std::ostream& stream, int node_index);
@@ -123,6 +132,7 @@ private:
 
 struct GNN {
     GNNGraph graph;
+    Box box;
     Network* fw;
     Network* gw;
     //TransitionFunction* transition;

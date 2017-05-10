@@ -4,15 +4,16 @@
 #define SIZEOF(_arr) (sizeof(_arr)/sizeof(_arr[0]))
 
 int main() {
+	double box_size[3] = {7.0,7.0,7.0};
 	Trajectory traj;
-	traj.load("water_trajectories.dat", {7.0,7.0,7.0});
+	traj.load("water_trajectories.dat");
 	printf("Number of atoms: %d\n", traj.num_atoms);
 	printf("Number of steps: %d\n", traj.num_steps);
-	traj.print(0,1);
+	//traj.print(0,0);
 
 	/*Initialize the fw and gw networks!*/
 	//fw
-	int fw_input_size = calculateFwInputSize(NUM_EDGE_LABELS, NUM_NODE_LABELS, NODE_STATE_SIZE, 0, false);
+	int fw_input_size = calculateFwInputSize(NUM_EDGE_LABELS, NUM_NODE_LABELS, NODE_STATE_SIZE, traj.num_atoms-1, true);
 	int fw_layer_sizes[] = {10, NODE_STATE_SIZE};
 	ActivationFunction::Enum fw_activators[] = {
         ActivationFunction::SIGMOID,
@@ -37,19 +38,24 @@ int main() {
 	network_load_parameters(gw, gw_parameters);
 	/*End of network initialization*/
 
-	GNN* gnn = constructGNN(traj, 0, fw, gw);
-	gnn->graph.debug(std::cout, 38);
-	/*
+	Frame frame;
+	traj.getFrame(1, frame);
+	frame.print();
+	GNN* gnn = constructGNN(frame, fw, gw, box_size);
+	//gnn->graph.debug(std::cout, 38);
+	//gnn->graph.debug(std::cout);
+	
 	//Random initial size
 	arma::vec random_state(gnn->getStateSize(), arma::fill::randn);
 	gnn->setState(random_state.n_rows, random_state.memptr());
 	for(int i = 0; i < 5; ++i) {
 		double r = gnn->step();
-		printf("%f", r);
+		printf("%f\n", r);
 	}
+
 	destroyGNN(gnn);
 	network_destroy(fw);
 	network_destroy(gw);
-	*/
+	
 	return 0;
 }

@@ -5,6 +5,38 @@
 #include <cmath>
 #include <armadillo>
 
+void Box::init(double x, double y, double z) {
+    box_size[0] = x;
+    box_size[1] = y;
+    box_size[2] = z;
+    r_box_size[0] = 1.0/x;
+    r_box_size[1] = 1.0/y;
+    r_box_size[2] = 1.0/z;
+}
+
+double Box::distance(const double* v1, const double* v2) const {
+    double dist = 0.0;
+    for(int d = 0; d < 3; ++d) {
+        double dd = std::abs(v1[d] - v2[d]);
+        dd -= ((double)static_cast<int>(dd * r_box_size[d] +  0.5)) * box_size[d];
+        dist += dd*dd;
+    }
+    return std::sqrt(dist);
+}
+
+double Box::relative_pos(double* relative, const double* origo, double* neighbor) {
+    for(int d = 0; d < 3; ++d) {
+        relative[d] = (neighbor - origo)*r_box_size[d];
+        if(relative[d] < -0.5)
+            relative[d] += 1.0;
+        else if(relative[d] > 0.5)
+            relative[d] -= 1.0;
+        relative[d] *= box_size[d];
+    }
+}
+
+
+
 //Store edges to hash map with this index
 union EdgeIndex {
     //Guaranteed invariant, node1 <= node2
@@ -24,12 +56,15 @@ union EdgeIndex {
     }
 };
 
-GraphHelper::GraphHelper(int _nodeLabelSize, int _edgeLabelSize, bool _has_position)
+GraphHelper::GraphHelper(int _nodeLabelSize, int _edgeLabelSize, bool _has_position, double* _box_size)
     : nodeLabelSize(_nodeLabelSize), edgeLabelSize(_edgeLabelSize), 
     n_nodes(0), n_edges(0), has_position(_has_position)
 {
-    if(_has_position)
+    if(_has_position) {
         assert(nodeLabelSize >= 3);
+        assert(_box_size != nullptr);
+        box.init(_box_size[0], _box_size[1], _box_size[2]);
+    }
 }
 
 int GraphHelper::addNode(int _size, const double* _nodeLabel) {
@@ -73,7 +108,8 @@ bool GraphHelper::hasEdge(int node1, int node2) {
 
 int GraphHelper::getEdgeIndex(int node1, int node2) {
     EdgeIndex idx(node1, node2);
-    return edge_indices.at(idx.as_int);
+    //return edge_indices.at(idx.as_int);
+    return edge_indices[idx.as_int];
 }
 
 bool GraphHelper::isCompleteGraph() {
@@ -129,10 +165,10 @@ void GNNGraph::create(GraphHelper& _helper) {
     n_neighbors[n_nodes] = neighbor_size;
     neighbors = new int[neighbor_size];
     edges = new int[neighbor_size];
-
+    
     for(int i = 0; i < n_nodes; ++i) {
-        int* neighbor_ptr = &neighbors[n_neighbors[i]];
-        int* edge_ptr = &edges[n_neighbors[i]];
+        int* neighbor_ptr = neighbors + n_neighbors[i];
+        int* edge_ptr = edges + n_neighbors[i];
         int n_counter = 0;
         for(int j = 0; j < n_nodes; ++j) {
             if(_helper.hasEdge(i,j)) {
@@ -142,6 +178,7 @@ void GNNGraph::create(GraphHelper& _helper) {
             }
         }
     }
+    
     node_label_size = _helper.nodeLabelSize;
     edge_label_size = _helper.edgeLabelSize;
     node_labels = new double[_helper.node_labels.size()];
@@ -151,7 +188,7 @@ void GNNGraph::create(GraphHelper& _helper) {
     memcpy(edge_labels, _helper.edge_labels.data(),
         sizeof(double)*_helper.edge_labels.size());
     if(_helper.has_position)
-        sortPositions();
+        sortPositions(_helper.box);
 }
 
 void GNNGraph::destroy() {
@@ -164,7 +201,7 @@ void GNNGraph::destroy() {
     }
 }
 
-void GNNGraph::sortPositions() {
+void GNNGraph::sortPositions(const Box& _box) {
     for(int i = 0; i < n_nodes; ++i) {
         const int num_neighbors = n_neighbors[i+1] - n_neighbors[i];
         const int n_index = n_neighbors[i];
@@ -175,11 +212,22 @@ void GNNGraph::sortPositions() {
         for(int j = 0; j < num_neighbors; ++j) {
             const double* n_label = node_labels + node_label_size*neighbors[n_index+j];
             arma::vec neighbor_pos({n_label[0], n_label[1], n_label[2]});
-            distances.push_back(arma::norm(node_pos - neighbor_pos));
+            distances.push_back(_box.distance(n_label, label));
         }
+        /*
+        std::cout << "Sorting for node " << i << std::endl;
+        for(int j = 0; j < num_neighbors; ++j) {
+            std::cout << neighbors[n_index + j] << " " << distances[j] << std::endl;
+        }
+        */
         //Sort according to distances
         std::sort(&neighbors[n_index], &neighbors[n_index] + num_neighbors,
             [&distances](size_t i1, size_t i2) {return distances[i1] < distances[i2];});
+        /*
+        for(int j = 0; j < num_neighbors; ++j) {
+            std::cout << neighbors[n_index + j] << std::endl;
+        }
+        */
     }
 }
 
@@ -215,26 +263,47 @@ void GNNGraph::debug(std::ostream& stream) {
     
     stream << std::endl << "Edge indices, nodes and labels:" << std::endl;
     for(int i = 0; i < graph.n_nodes; ++i) {
-        int n_index = graph.n_neighbors[i];
+        const int n_index = graph.n_neighbors[i];
         int num_neighbors = graph.n_neighbors[i+1] - graph.n_neighbors[i];
         for(int j = 0; j < num_neighbors; ++j) {
             if(i < graph.neighbors[n_index + j]) {
                 stream << graph.edges[n_index + j] << ' ';
                 stream << '(' << i << ',' << graph.neighbors[n_index + j] << ") ";
                 for(int k = 0; k < edge_label_size; ++k) {
-                    stream << edge_labels[graph.edges[n_index + j]] << ' ';
+                    stream << edge_labels[edges[n_index + j]*edge_label_size + k] << ' ';
                 }
                 stream << std::endl;
             }
         }
     }
-    
+    stream << std::endl << "n_neighbors array:" << std::endl;
+    for(int i = 0; i < n_nodes; ++i) {
+        stream << n_neighbors[i] << ' ';
+    }
+    stream << std::endl << std::endl;
+    for(int i = 0; i < n_neighbors[n_nodes]; ++i) {
+        stream << neighbors[i] << ' ';
+    }
+    stream << std::endl;
+    stream << "Edge indices array" << std::endl;
+    for(int i = 0; i < n_neighbors[n_nodes]; ++i) {
+        stream << edges[i] << ' ';
+    }
+    stream << std::endl;
+    /*
+    stream << "Edge label array" << std::endl;
+    for(int i = 0; i < n_nodes; ++i) {
+        const double* labels = edge_labels[edges[n_neighbors[i]
+        stream << edge_labels[i] << ' ';
+    }
+    stream << std::endl;
+    */
 }
 
 void GNNGraph::debug(std::ostream& _stream, int _index) {
     assert(_index < n_nodes);
     _stream << "Debug for node: " << _index << std::endl;
-    Node node(maxNeighbors());
+    Node node;
     getNode(_index, node);
     _stream << "Node num neighbors: " << node.num_neighbors << std::endl;
     _stream << "Node neighbors:" << std::endl;
@@ -244,27 +313,23 @@ void GNNGraph::debug(std::ostream& _stream, int _index) {
     _stream << std::endl;
     _stream << "Node edges:" << std::endl;
     for(int i = 0; i < node.num_neighbors; ++i) {
-        _stream << i << ' ' << edges[edges[i]] << ' ';
-        _stream << '(' << i << ',' << neighbors[node.neighbors[i]] << ") ";
+        _stream << i << ' ' << edges[i] << ' ';
+        _stream << '(' << _index << ',' << node.neighbors[i] << ") ";
+        for(int k = 0; k < edge_label_size; ++k) {
+            _stream << edge_labels[edges[i]*edge_label_size + k] << ' ';
+        }
         _stream << std::endl;
     }
 }
 
-GNNGraph::Node::Node(int _max_neighbors) {
-    neighbors = new int[_max_neighbors];
-    edges = new int[_max_neighbors];
-}
-
-GNNGraph::Node::~Node() {
-    //These segfault, why?
-    //delete[] neighbors;
-    //delete[] edges;
-}
 
 GNN::GNN(GraphHelper& _helper, int _node_state_size, Network* _fw, Network* _gw)
     : graph(_helper), fw(_fw), gw(_gw), node_state_size(_node_state_size)
 {
     has_position = _helper.has_position;
+    if(has_position) {
+        box = _helper.box;
+    }
     node_state_size = _node_state_size;
     max_neighbors = graph.maxNeighbors();
     state_size = node_state_size*graph.n_nodes;
@@ -322,7 +387,7 @@ Input layout:
 [Node label | Neighbor 0 edge label | Neighbor 0 node label | Neighbor 0 node state | Neighbor 1 edge label | ...]
 */
 void GNN::stepPositional() {
-    GNNGraph::Node node(max_neighbors);
+    GNNGraph::Node node;
     for(int i = 0; i < graph.n_nodes; ++i ) {
         for(int j = 0; j < nn_input_size; ++j)
             nn_input[j] = null_value;
@@ -332,18 +397,18 @@ void GNN::stepPositional() {
         //Fill out the input
         const int index = node.node;
         memcpy(input_ptr, graph.node_labels + graph.node_label_size*index, graph.node_label_size*sizeof(double));
-        arma::vec node_pos(graph.node_labels + graph.node_label_size*index, 3, false, true);
+        double* node_pos = graph.node_labels + graph.node_label_size*index;
         input_ptr += graph.node_label_size;
         for(int j = 0; j < node.num_neighbors; ++j) {
-            const int n_index = node.neighbors[i];
-            memcpy(input_ptr, graph.edge_labels + graph.edge_label_size*n_index, graph.edge_label_size*sizeof(double));
+            const int n_index = node.neighbors[j];
+            const int e_index = node.edges[j];
+            memcpy(input_ptr, graph.edge_labels + graph.edge_label_size*e_index, graph.edge_label_size*sizeof(double));
             input_ptr += graph.edge_label_size;
 
             //Copy node label and calculate relative position
             memcpy(input_ptr, graph.node_labels + graph.node_label_size*n_index, graph.node_label_size*sizeof(double));
-            arma::vec neighbor_pos(graph.node_labels + graph.node_label_size*n_index, 3, false, true);
-            const arma::vec rel_pos = node_pos  - neighbor_pos;
-            memcpy(input_ptr, rel_pos.memptr(), 3*sizeof(double));
+            double* neighbor_pos = graph.node_labels + graph.node_label_size*n_index;
+            box.relative_pos(input_ptr, node_pos, neighbor_pos);
             input_ptr += graph.node_label_size;
 
             memcpy(input_ptr, state + node_state_size*n_index, node_state_size*sizeof(double));
@@ -355,7 +420,7 @@ void GNN::stepPositional() {
 }
 
 void GNN::stepNonPositional() {
-    GNNGraph::Node node(max_neighbors);
+    GNNGraph::Node node;
     for(int i = 0; i < graph.n_nodes; ++i ) {
         graph.getNode(i, node);
         arma::vec node_state(node_state_size, arma::fill::zeros);
@@ -364,9 +429,10 @@ void GNN::stepNonPositional() {
         for(int j = 0; j < node.num_neighbors; ++j) {
             double* input_ptr = nn_input + graph.node_label_size;
             const int n_index = node.neighbors[i];
-            memcpy(input_ptr, graph.edge_labels + graph.edge_label_size*n_index, graph.edge_label_size*sizeof(double));
+            const int e_index = node.edges[i];
+            memcpy(input_ptr, graph.edge_labels + graph.edge_label_size*e_index, graph.edge_label_size*sizeof(double));
             input_ptr += graph.edge_label_size;
-            memcpy(input_ptr, graph.node_labels + graph.node_label_size*n_index, graph.node_label_size*sizeof(double));
+            memcpy(input_ptr, graph.node_labels + graph.node_label_size*e_index, graph.node_label_size*sizeof(double));
             input_ptr += graph.node_label_size;
             memcpy(input_ptr, state + node_state_size*n_index, node_state_size*sizeof(double));
             input_ptr += node_state_size;

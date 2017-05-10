@@ -24,7 +24,7 @@ Trajectory::~Trajectory() {
 	destroy();
 }
 
-void Trajectory::load(const char* _path, const double* _box_size) {
+void Trajectory::load(const char* _path) {
 	FILE * pFile;
 	pFile = fopen (_path,"r");
 	if(pFile == NULL) {
@@ -33,7 +33,7 @@ void Trajectory::load(const char* _path, const double* _box_size) {
 	char buffer[2048];
 	int ok;
 	fgets(buffer, sizeof(buffer), pFile);
-	printf("%s\n",buffer);
+	//printf("%s\n",buffer);
 	fscanf(pFile, "%*s %*s %*s %d", &num_atoms);
 	fscanf(pFile, "%*s %*s %*s %*s %d", &num_steps);
 	assert(num_steps > 0);
@@ -63,20 +63,8 @@ void Trajectory::load(const char* _path, const double* _box_size) {
 		fgets(buffer, sizeof(buffer), pFile);
 	}
 	fclose(pFile);
-	memcpy(box_size, _box_size, 3*sizeof(double));
-	for(int i = 0; i < 3; ++i)
-		r_box_size[i] = 1.0/box_size[i];
 }
 
-double Trajectory::distance(const double* ai, const double* aj) const {
-	arma::vec vector(3);
-	for(int d = 0; d < 3; ++d) {
-		double dd = abs(aj[d] - ai[d]);
-		dd -= static_cast<int>(dd * r_box_size[d] +  0.5) * box_size[d];
-		vector[d] = dd;
-	}
-	return arma::norm(vector);
-}
 
 void Trajectory::destroy() {
 	if(atoms != NULL) {
@@ -97,10 +85,28 @@ void Trajectory::print(int _atom_index, int _step) {
 	printf("Force: (%lf, %lf, %lf)\n", force[0], force[1], force[2]);
 }
 
+void Trajectory::getFrame(int _index, Frame& _frame) {
+	assert(_index < num_steps);
+	_frame.num_atoms = num_atoms;
+	_frame.atomic_numbers = atoms;
+	_frame.positions = arma::vec(&positions[3*num_atoms*_index], 3*num_atoms, false);
+	_frame.forces = arma::vec(&forces[3*num_atoms*_index], 3*num_atoms, false);
+}
+
+void Frame::print() {
+	for(int i = 0; i < num_atoms; ++i) {
+		const double* pos = &positions[3*i];
+		const double* force = &forces[3*i];
+		printf("Index %d, Z: %d\n", i, atomic_numbers[i]);
+		printf("Position:\t(%lf, %lf, %lf)\n", pos[0], pos[1], pos[2]);
+		printf("Force:\t\t(%lf, %lf, %lf)\n", force[0], force[1], force[2]);
+	}
+}
+
 
 int calculateFwInputSize(int num_edge_labels, int num_node_labels, int node_state_size, int max_neighbors, bool positional) {
 	if(positional) {
-		return num_node_labels + max_neighbors*(num_edge_labels + num_node_labels + node_state_size + 3);
+		return num_node_labels + max_neighbors*(num_edge_labels + num_node_labels + node_state_size);
 	}
 	else {
 		return  2*num_node_labels + num_edge_labels + node_state_size;
@@ -110,26 +116,29 @@ int calculateFwInputSize(int num_edge_labels, int num_node_labels, int node_stat
 /*
 node label size is one (Z) and edge label size is two (1/r, Z_i*Z_j/r)
 */
-void constructGraph(const Trajectory& _traj, int _index, GraphHelper& _helper) {
-	assert(NUM_EDGE_LABELS == 2);
-	assert(NUM_NODE_LABELS == 1);
-	assert(_index < _traj.num_steps);
-	double* pos = _traj.positions + 3*_index*_traj.num_atoms;
-	for(int i = 0; i < _traj.num_atoms; ++i) {
-		_helper.addNode({(double)_traj.atoms[i]});
+void constructGraph(const Frame& _frame, GraphHelper& _helper) {
+	assert(NUM_EDGE_LABELS == 1);
+	assert(NUM_NODE_LABELS == 4);
+	const double* pos = _frame.positions.memptr();
+	for(int i = 0; i < _frame.num_atoms; ++i) {
+		_helper.addNode({pos[3*i], pos[3*i+1], pos[3*i+2], (double)_frame.atomic_numbers[i]});
+		//std::cout << "Position of atom " << i << " (" << pos[3*i] << "," << pos[3*i+1] <<"," << pos[3*i+2] <<")" << std::endl;
 		for(int j = 0; j < i; ++j) {
-			double dist = _traj.distance(pos + 3*i, pos + 3*j);
+			double dist = _helper.box.distance(pos + 3*i, pos + 3*j);
+			//std::cout << "Distance between " << i << " and " << j << ": " << dist << std::endl;
 			double rdist = 1.0/dist;
-			double coulomb_rdist = _traj.atoms[i]*_traj.atoms[j] * rdist;
-			_helper.addEdge(j,i, {dist, coulomb_rdist});
+			//double coulomb_rdist = _traj.atoms[i]*_traj.atoms[j] * rdist;
+			_helper.addEdge(j,i, {dist});
 		}
 	}
 }
 
-GNN* constructGNN(const Trajectory& _traj, int _index, Network* _fw, Network* _gw) {
-	GraphHelper helper(1,2, false);
-	constructGraph(_traj, _index, helper);
+GNN* constructGNN(const Frame& _frame, Network* _fw, Network* _gw, double* _box_size) {
+	GraphHelper helper(NUM_NODE_LABELS,NUM_EDGE_LABELS, true, _box_size);
+	constructGraph(_frame, helper);
 	GNN* gnn = new GNN(helper, NODE_STATE_SIZE, _fw, _gw);
+	//std::cout << "Edge index for (35,38): " << helper.getEdgeIndex(35,38) << std::endl;
+	//std::cout << "Has edge (35,35): " << helper.hasEdge(35,35) << std::endl;
 	return gnn;
 }
 void destroyGNN(GNN* _gnn) {

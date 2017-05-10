@@ -52,6 +52,8 @@ int main() {
 		double r = gnn->step();
 		printf("%f\n", r);
 	}
+	arma::vec out(gnn->output_size());
+	gnn->get_output(out);
 
 	destroyGNN(gnn);
 	network_destroy(fw);

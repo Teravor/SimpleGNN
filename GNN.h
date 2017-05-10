@@ -173,6 +173,7 @@ struct GNN {
     /*Armadillo interface*/
     void load_parameters(const arma::vec& parameters);
     void compute(double _tol, arma::vec& output);
+    void get_output(arma::vec& output);
 
 private:
     GNN(const GNN&); // no implementation

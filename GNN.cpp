@@ -500,7 +500,18 @@ void GNN::compute(double _tol, int size, double* _output) {
         network_compute(gw, node_state_size, &state[i*node_state_size]);
         const double* out = network_output(gw);
         memcpy(_output, out, node_state_size*sizeof(double));
-        _output += node_state_size*sizeof(double);
+        _output += node_state_size;
+    }
+}
+
+void GNN::get_output(arma::vec& _output) {
+    double* output = _output.memptr();
+    //Get the output from gw network to _output
+    for(int i = 0; i < graph.n_nodes; ++i) {
+        network_compute(gw, node_state_size, &state[i*node_state_size]);
+        const double* out = network_output(gw);
+        memcpy(output, out, node_state_size*sizeof(double));
+        output += node_state_size;
     }
 }
 

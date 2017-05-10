@@ -38,7 +38,7 @@ int main() {
 	network_load_parameters(gw, gw_parameters);
 	/*End of network initialization*/
 	//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-	for(int i = 0; i < traj.num_steps) {
+	for(int i = 0; i < traj.num_steps; ++i) {
 		Frame frame;
 		traj.getFrame(i, frame);
 		GNN* gnn = constructGNN(frame, fw, gw, box_size);
@@ -50,7 +50,7 @@ int main() {
 		}
 		arma::vec out(gnn->output_size());
 		gnn->get_output(out);
-		R = out - frame.forces;
+		arma::vec R = out - frame.forces;
 		destroyGNN(gnn);
 	}
 	//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++

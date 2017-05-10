@@ -37,14 +37,32 @@ int main() {
 	network_load_parameters(fw, fw_parameters);
 	network_load_parameters(gw, gw_parameters);
 	/*End of network initialization*/
-
+	//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+	for(int i = 0; i < traj.num_steps) {
+		Frame frame;
+		traj.getFrame(i, frame);
+		GNN* gnn = constructGNN(frame, fw, gw, box_size);
+		arma::vec random_state(gnn->getStateSize(), arma::fill::randn);
+		gnn->setState(random_state.n_rows, random_state.memptr());
+		for(int i = 0; i < 5; ++i) {
+			double r = gnn->step();
+			printf("%f\n", r);
+		}
+		arma::vec out(gnn->output_size());
+		gnn->get_output(out);
+		R = out - frame.forces;
+		destroyGNN(gnn);
+	}
+	//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 	Frame frame;
 	traj.getFrame(1, frame);
 	frame.print();
 	GNN* gnn = constructGNN(frame, fw, gw, box_size);
 	//gnn->graph.debug(std::cout, 38);
 	//gnn->graph.debug(std::cout);
-	
+	arma::vec random_parameters(gnn->parameter_size(), arma::fill::randn);
+	gnn->load_parameters(random_parameters);
+
 	//Random initial size
 	arma::vec random_state(gnn->getStateSize(), arma::fill::randn);
 	gnn->setState(random_state.n_rows, random_state.memptr());

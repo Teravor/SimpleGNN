@@ -16,10 +16,10 @@ void tanh_kernel(int size, double* data);
 void tanh_prime_kernel(int size, double* data);
 
 static const ActivationFunction activation_functions[] = {
-    {false, 0.0, true, 0.0, &relu_kernel, &relu_prime_kernel},
-    {false, 0.0, false, 0.0, &lin_kernel, &lin_prime_kernel},
-    {true, 1.0, true, 0.0, &sigmoid_kernel, &sigmoid_prime_kernel},
-    {true, 1.0, true, -1.0, &tanh_kernel, &tanh_prime_kernel}
+    {false, 0.0, true, 0.0, -1.0, &relu_kernel, &relu_prime_kernel},
+    {false, 0.0, false, 0.0, 0.0, &lin_kernel, &lin_prime_kernel},
+    {true, 1.0, true, 0.0, -1e46, &sigmoid_kernel, &sigmoid_prime_kernel},
+    {true, 1.0, true, -1.0, -1e46, &tanh_kernel, &tanh_prime_kernel}
 };
 
 ActivationFunction getActivationFunction(ActivationFunction::Enum func) {
@@ -121,7 +121,6 @@ void network_load_parameters(Network* n, const arma::vec& parameters) {
     network_load_parameters(n, parameters.n_rows, parameters.memptr());
 }
 void network_compute(Network* n, const arma::vec& input) {
-  
     network_compute(n, input.n_rows, input.memptr());
 }
 void network_output(Network* n, arma::vec& output) {

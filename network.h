@@ -2,7 +2,7 @@
 #include <signal.h>
 
 #define BREAKPOINT (raise(SIGINT))
-#define NULL 0
+#include <stddef.h>
 
 typedef void (*kernel)(int size, double* data);
 
@@ -17,6 +17,7 @@ struct ActivationFunction {
     double max_val;
     bool min_bounded;
     double min_val;
+    double null_value;
     kernel activation;
     kernel activation_prime;
 };

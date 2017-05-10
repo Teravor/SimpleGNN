@@ -30,7 +30,7 @@ int main(int argc, char* argv[]) {
         ActivationFunction::SIGMOID, 
         ActivationFunction::SIGMOID, 
         ActivationFunction::SIGMOID};
-    int layer_sizes[] =  {40,40,1};
+    int layer_sizes[] =  {50,50,1};
 
     Network* n = network_create(1, 
         SIZEOF(layer_sizes), layer_sizes, 
@@ -59,7 +59,7 @@ int main(int argc, char* argv[]) {
     out.col(0) = x;
     out.col(1) = result/normalization - shift;
     out.col(2) = y;
-    out.save("sin.dat", arma::raw_ascii);
+    out.save("sinBack.dat", arma::raw_ascii);
     epoch_errors.save("epoch_errors.dat", arma::raw_ascii);
     network_destroy(n);
     

@@ -21,12 +21,12 @@ add_library(GNN GNN.cpp GNN_interface.cpp)
 target_link_libraries(GNN network ${ARMADILLO_LIBRARIES})
 
 #Test cases
-#add_executable(test_ga myGaMDMPI.cpp )
-#target_link_libraries(test_ga network )
-add_executable(testGNN testGNN.cpp)
-target_link_libraries(testGNN network)
-#add_executable(test_sin test_sin.cpp)
-#target_link_libraries(test_sin network)
+add_executable(test_ga myGaMDMPI.cpp )
+target_link_libraries(test_ga network )
+#add_executable(testGNN testGNN.cpp)
+#target_link_libraries(testGNN network)
+add_executable(test_sin test_sin.cpp)
+target_link_libraries(test_sin network)
 #add_executable(ga test_ga.cpp)
 #target_link_libraries(ga network)
 

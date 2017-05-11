@@ -28,7 +28,7 @@ double Box::distance(const double* v1, const double* v2) const {
 
 double Box::relative_pos(double* relative, const double* origo, double* neighbor) {
     for(int d = 0; d < 3; ++d) {
-        relative[d] = (neighbor - origo)*r_box_size[d];
+        relative[d] = (neighbor[d] - origo[d])*r_box_size[d];
         if(relative[d] < -0.5)
             relative[d] += 1.0;
         else if(relative[d] > 0.5)

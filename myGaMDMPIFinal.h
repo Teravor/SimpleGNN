@@ -1,6 +1,7 @@
 #ifndef myGAMPI
 #define myGA7MPI
 
+#include "GNN_interface.h"
 #include <iostream>
 #include <string>
 #include <armadillo>
@@ -9,122 +10,78 @@
 #include "network.h"
 #include "armadilloMPI.h"
 
+#define SIZEOF(_arr) (sizeof(_arr)/sizeof(_arr[0]))
 
 using namespace std;
 using namespace arma;
 
-//----------------------------------------------------------------------
-vec getVals(mat DNAS, Network* net, rowvec inp){
-	 vec vals(DNAS.n_rows);
-  vec inputs = inp(span(0,inp.n_elem - 2)).t();
-           for(int j=0;j < DNAS.n_rows; j++){
-           for(int i=0;i < DNAS.n_cols; i++){ //
-	              net->parameters[i] = DNAS(j,i);
-	          }
-       network_compute(net, inputs);
-//           network_mlp_compute_relu_lin(net);
-	            vals(j) = net -> outputs[0];
-	         }
-	   return vals;
-       }
-
-
-//----------------------------------------------------------------------
-double getValDiff(vec v, Network* net, rowvec inp){
-  vec inputs = inp(span(0,inp.n_elem - 2)).t();
-           for(int i=0;i < v.n_elem; i++){
-	      net->parameters[i] = v(i);
-	   }
-           network_compute(net,inputs);
-	   return net -> outputs[0] - inp(inp.n_elem-1);
-       }
-//----------------------------------------------------------------------
-double getVal(vec v, Network* net, rowvec inp){
-  vec inputs = inp(span(0,inp.n_elem - 2)).t();
-           for(int i=0;i < v.n_elem; i++){
-	      net->parameters[i] = v(i);
-	   }
-           network_compute(net,inputs);
-	   return net -> outputs[0];
-       }
-//----------------------------------------------------------------------
-vec getBest(mat DNAS, Network* net, mat X, int world_rank, int world_size){
-	vec accv = zeros<vec>(DNAS.n_rows);
-	vec accvBuff = zeros<vec>(DNAS.n_rows);
-	int XNrows = X.n_rows;
-	int XNcols = X.n_cols;
-	int DNASNcols = DNAS.n_cols;
-	int DNASNrows = DNAS.n_rows;
-	vec v(DNAS.n_rows);
-	vec prod(X.n_rows);
-  //------Paral -----------------------------------------------------
-        for(int k=  XNrows / world_size * world_rank; k < XNrows*( world_rank + 1)/ world_size; k++){
-        for(int j=0;j < DNASNrows; j++){
-           for(int i=0;i < DNASNcols; i++){ 
-	      net->parameters[i] = DNAS.at(j,i);
-	   }
-         network_compute(net,X(k,span(0,X.n_cols - 2)));
-	  v(j) = net -> outputs[0]; 
-	  accv(j) = accv(j) + abs(v(j) - X(k,XNcols-1)); 
-	}
-}
-
-
-if(world_rank != 0){
-	        MPI_SendVec( accv, 0, 123);
-	        MPI_RecvVec( accv, 0, 234);
-}
-
-if(world_rank == 0){ 
-
-	for(int i=1; i < world_size; i++) { MPI_RecvVec( accvBuff, i, 123); accv = accv + accvBuff; }
-
-
-  //------Paral End -----------------------------------------------------
-
-	accv = - accv;
-
-
-        cout << " max average fitness CV per sample: " << accv.max()/X.n_rows << endl;
-
-	for(int i=1; i < world_size; i++) { MPI_SendVec(accv, i, 234);};
-
-    }
-
-
-	return DNAS.row(index_max(accv)).t();
-
-        }
-
-//----------------------------------------------------------------------
-vec getResults(mat DNAS, Network* net, mat X, int world_rank, int world_size){
-    vec bestWeights = getBest(DNAS, net, X, world_rank, world_size);
-	vec results(X.n_rows);
-    for(int j=0;j < bestWeights.n_elem; j++){
-        net->parameters[j] = bestWeights(j);
-    }
-	for(int i=0; i < X.n_rows; i++){
-         network_compute(net,X(i,span(0,X.n_cols - 2)));
-       results(i) = net -> outputs[0];
-    }
-    
-	   return results;
-       }
-//----------------------------------------------------------------------
-mat ga_eval(mat DNAS, Network* net, mat X ,  double mutRat, double mutAmmount, double bigMut,double bigMutAmmount,
+mat ga_eval(mat DNAS, double mutRat, double mutAmmount, double bigMut,double bigMutAmmount,
                                                           double veryBigMut, double verBigMutAmmount, int
                                                           finalizeit, double regu , double linContr, double squareContr, int world_rank, int world_size){
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  double box_size[3] = {7.0,7.0,7.0};
+  Trajectory traj;
+  traj.load("water_trajectories.dat");
+  printf("Number of atoms: %d\n", traj.num_atoms);
+  printf("Number of steps: %d\n", traj.num_steps);
+ vec accv = zeros<vec>(DNAS.n_rows);
+double Xrows = 1000;
+double Xcols = 1000;
 
-//MPI_Init(NULL,NULL);
-//cout << "YO, rank iz: "<< world_rank <<endl;
+  /*Initialize the fw and gw networks!*/
+  //fw
+  int fw_input_size = calculateFwInputSize(NUM_EDGE_LABELS, NUM_NODE_LABELS, NODE_STATE_SIZE, traj.num_atoms-1, true);
+  int fw_layer_sizes[] = {10, NODE_STATE_SIZE};
+  ActivationFunction::Enum fw_activators[] = { 
+        ActivationFunction::SIGMOID,
+      ActivationFunction::SIGMOID};
+  Network* fw = network_create(
+    fw_input_size,
+    SIZEOF(fw_layer_sizes), fw_layer_sizes,
+    SIZEOF(fw_activators), fw_activators);
+  //gw
+  ActivationFunction::Enum gw_activators[] = { 
+        ActivationFunction::SIGMOID, 
+        ActivationFunction::SIGMOID};
+    int gw_layer_sizes[] = {10,OUTPUT_SIZE};
+  Network* gw = network_create(
+    NODE_STATE_SIZE,
+    SIZEOF(gw_layer_sizes), gw_layer_sizes,
+    SIZEOF(gw_activators), gw_activators);
+  //Load them with random parameters
+  arma::vec fw_parameters(fw->parameter_size, arma::fill::randn);
+  arma::vec gw_parameters(gw->parameter_size, arma::fill::randn);
+  network_load_parameters(fw, fw_parameters);
+  network_load_parameters(gw, gw_parameters);
+  /*End of network initialization*/
+  Frame frame;
+  traj.getFrame(1, frame);
+  frame.print();
+  GNN* gnn = constructGNN(frame, fw, gw, box_size);
+  arma::vec random_parameters(gnn->parameter_size(), arma::fill::randn);
+  gnn->load_parameters(random_parameters);
+  //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  for(int i = 0; i < traj.num_steps; ++i) {
+    Frame frame;
+    traj.getFrame(i, frame);
+    GNN* gnn = constructGNN(frame, fw, gw, box_size);
+    arma::vec random_state(gnn->getStateSize(), arma::fill::randn);
+    gnn->setState(random_state.n_rows, random_state.memptr());
+    for(int i = 0; i < 5; ++i) { //forloop till it converges
+      double r = gnn->step();
+      printf("%f\n", r); 
+    }   
+    arma::vec out(gnn->output_size());
+    gnn->get_output(out);
+    accv = abs(out - frame.forces);
+  }
+  //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-  int Xrows = X.n_rows;
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
   double newVal;
-  int Xcols = X.n_cols;
   int DNAScols = DNAS.n_cols;
   int DNASrows = DNAS.n_rows;
-	int XNrows = X.n_rows;
-	int XNcols = X.n_cols;
 	int DNASNcols = DNAS.n_cols;
 	int DNASNrows = DNAS.n_rows;
 	vec n = zeros<vec>(DNASrows);
@@ -138,24 +95,24 @@ mat ga_eval(mat DNAS, Network* net, mat X ,  double mutRat, double mutAmmount, d
 	double punishment = 0;
 
 	vec v(DNASrows);
-	vec accv = zeros<vec>(DNASrows);
+//	vec accv = zeros<vec>(DNASrows);
 	vec accvBuff = zeros<vec>(DNAS.n_rows);
 	vec orderedV(DNASrows);
 
 
 //------- PARAL ------------------------------
-        for(int k=  XNrows / world_size * world_rank; k < XNrows*( world_rank + 1)/ world_size; k++){
-        for(int j=0;j < DNASrows; j++){
-           for(int i=0;i < DNAScols; i++){
-	            net->parameters[i] = DNAS.at(j,i);
-	   }
-          network_compute(net, X(k, span(0,X.n_cols - 2)));
-	  v.at(j) = net -> outputs[0]; //////// ----FIX HERE
-    newVal = abs(v.at(j) - X.at(k,Xcols-1));
-	  accv.at(j) = accv.at(j) + linContr*newVal + squareContr*pow(10*newVal,2)/10.0 + regu * sum(abs(DNAS.row(j))) ;
+//        for(int k=  XNrows / world_size * world_rank; k < XNrows*( world_rank + 1)/ world_size; k++){
+//        for(int j=0;j < DNASrows; j++){
+//           for(int i=0;i < DNAScols; i++){
+//	            net->parameters[i] = DNAS.at(j,i);
+//	   }
+//          network_compute(net, X(k, span(0,X.n_cols - 2)));
+//	  v.at(j) = net -> outputs[0]; //////// ----FIX HERE
+//    newVal = abs(v.at(j) - X.at(k,Xcols-1));
+//	  accv.at(j) = accv.at(j) + linContr*newVal + squareContr*pow(10*newVal,2)/10.0 + regu * sum(abs(DNAS.row(j))) ;
 //	  accv.at(j) = accv.at(j) + linContr*newVal + regu * sum(abs(DNAS.row(j))) ;
-	}
-	}
+//	}
+//	}
 //------- RAL ------------------------------
 
 if(world_rank != 0){
@@ -178,6 +135,7 @@ if(world_rank == 0){
 	uvec q = sort_index(accv,"descend");
 
         for(int j=0;j < DNASrows; j++){
+      cout << "AAAAAAAAAAAAAAAAA" << j << endl;
             orderedDNAS.row(j)= DNAS.row(q(j)); 
 	    orderedV(j) = accv(q(j));
 	   } 
@@ -222,78 +180,15 @@ if(world_rank == 0){
 
     }
 
+    destroyGNN(gnn);
+  network_destroy(fw);
+  network_destroy(gw);
 
 	return newDNAS;
 }
 
 //----------------------------------------------------------------------
 //----------------------------------------------------------------------
-//----------------------------------------------------------------------
-
-mat hw(Network* net, mat ln, cube lnu, mat xu, mat lu,int uSize,int nSize){
-
-  mat x = zeros<mat>(xu.n_rows,xu.n_cols);
-  vec buffxn1 = zeros<vec>(xu.n_cols);
-  vec buffxn2 = zeros<vec>(xu.n_cols);
-  vec justZeros = zeros<vec>(xu.n_cols);
-
-  double lnn  = ln.n_cols;
-  double lnun = lnu.slice(0).n_cols;
-  double xun  = xu.n_cols;
-  double lun  =lu.n_cols;
-
-
-
-  double lnnx = lnn + lnun;
-  double lnnxx = lnnx + xun;
-  double lnnxxx = lnnxx + lun;
-
-  cout << lnnxxx << endl;
-
-  vec inputs = zeros<vec>(lnnxxx);
-
- 
-  for(int n=0;n<nSize;n++){
-    buffxn2 = justZeros;
-
-        for(int i=0;i<lnn;i++){ 
-            inputs(i) = ln(n,i);
-        }
-
-    for(int u=0;u<uSize;u++){
-        buffxn1 = justZeros;
-
-
-        if(n==u) continue;
-        
-        for(int i=lnn;i<lnnx;i++){
-          inputs(i) = lnu(n,i-lnn,u);
-        }
-
-        for(int i=lnnx;i<lnnxx;i++){
-          inputs(i) = xu(u,i-lnnx);
-        }
-
-        for(int i=lnnxx;i<lnnxxx;i++){
-         inputs(i) = lu(u,i - lnnxx);
-        }
-
-       network_compute(net, inputs);
-
-        for(int i=0; i < xu.n_cols; i++){
-
-          buffxn1(i) = net -> outputs[i]; 
-
-          }
-        buffxn2 = buffxn2 + buffxn1;
-
-    }
-      x.row(n) = buffxn2.t();
-
-  }
-  return x;
-
-  }
 
 
 #endif

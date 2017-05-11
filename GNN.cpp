@@ -18,7 +18,8 @@ double Box::distance(const double* v1, const double* v2) const {
     double dist = 0.0;
     for(int d = 0; d < 3; ++d) {
         double dd = std::abs(v1[d] - v2[d]);
-        dd -= ((double)static_cast<int>(dd * r_box_size[d] +  0.5)) * box_size[d];
+        //dd -= ((double)static_cast<int>(dd * r_box_size[d] +  0.5)) * box_size[d];
+        dd -= ((double)static_cast<int>(dd * r_box_size[d] +  0.5));
         dist += dd*dd;
     }
     return std::sqrt(dist);
@@ -31,7 +32,7 @@ double Box::relative_pos(double* relative, const double* origo, double* neighbor
             relative[d] += 1.0;
         else if(relative[d] > 0.5)
             relative[d] -= 1.0;
-        relative[d] *= box_size[d];
+        //relative[d] *= box_size[d];
     }
 }
 

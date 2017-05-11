@@ -17,9 +17,10 @@ void Box::init(double x, double y, double z) {
 double Box::distance(const double* v1, const double* v2) const {
     double dist = 0.0;
     for(int d = 0; d < 3; ++d) {
-        double dd = std::abs(v1[d] - v2[d]);
+        //double dd = std::abs(v1[d] - v2[d]);
         //dd -= ((double)static_cast<int>(dd * r_box_size[d] +  0.5)) * box_size[d];
-        dd -= ((double)static_cast<int>(dd * r_box_size[d] +  0.5));
+        double dd = std::abs(v1[d] - v2[d])*r_box_size[d];
+        dd -= ((double)static_cast<int>(dd +  0.5));
         dist += dd*dd;
     }
     return std::sqrt(dist);
